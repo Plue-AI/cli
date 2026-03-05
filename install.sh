@@ -60,8 +60,12 @@ download() {
 }
 
 # ── Main ─────────────────────────────────────────────────────────
+TMPDIR_CLEANUP=""
+cleanup() { [ -n "$TMPDIR_CLEANUP" ] && rm -rf "$TMPDIR_CLEANUP"; }
+trap cleanup EXIT
+
 main() {
-  local os arch version archive url tmpdir
+  local os arch version archive url
 
   os="$(detect_os)"
   arch="$(detect_arch)"
@@ -89,8 +93,8 @@ main() {
 
   echo "Installing ${BINARY} ${version} (${os}/${arch})..."
 
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  TMPDIR_CLEANUP="$(mktemp -d)"
+  local tmpdir="$TMPDIR_CLEANUP"
 
   echo "Downloading ${url}..."
   download "$url" "${tmpdir}/${archive}"
@@ -99,6 +103,7 @@ main() {
   tar xzf "${tmpdir}/${archive}" -C "$tmpdir"
 
   echo "Installing to ${INSTALL_DIR}/${BINARY}..."
+  mkdir -p "$INSTALL_DIR"
   if [ -w "$INSTALL_DIR" ]; then
     mv "${tmpdir}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
   else
