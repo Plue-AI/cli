@@ -5,9 +5,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  RUST_VERSION: '1.85'
-
 jobs:
   # ─────────────────────────────────────────────────────────────
   # Build CLI binaries for all platforms
@@ -33,11 +30,11 @@ jobs:
             use_cross: true
           # macOS
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             suffix: darwin-amd64
             use_cross: false
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             suffix: darwin-arm64
             use_cross: false
     steps:
@@ -46,13 +43,12 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
 
       - name: Install cross-compilation tools
         if: matrix.use_cross
         run: |
-          cargo install cross --git https://github.com/cross-rs/cross
+          cargo install cross --locked
 
       - name: Build CLI (cross)
         if: matrix.use_cross
