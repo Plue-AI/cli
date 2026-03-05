@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  RUST_VERSION: '1.85'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Build CLI binaries for all platforms
+  # This workflow lives in the main repo but will be copied to
+  # the public Plue-AI/cli repo by scripts/extract-cli-repo.ts.
+  # ─────────────────────────────────────────────────────────────
+  release-cli:
+    name: Release CLI (${{ matrix.suffix }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            suffix: linux-amd64
+            use_cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            suffix: linux-arm64
+            use_cross: true
+          # macOS
+          - target: x86_64-apple-darwin
+            os: macos-13
+            suffix: darwin-amd64
+            use_cross: false
+          - target: aarch64-apple-darwin
+            os: macos-14
+            suffix: darwin-arm64
+            use_cross: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.use_cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build CLI (cross)
+        if: matrix.use_cross
+        run: |
+          cross build --release --target ${{ matrix.target }}
+
+      - name: Build CLI (native)
+        if: ${{ !matrix.use_cross }}
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Package CLI binary
+        run: |
+          TAG="${{ github.ref_name }}"
+          BINARY="target/${{ matrix.target }}/release/plue"
+          ARCHIVE="plue-${TAG}-${{ matrix.suffix }}.tar.gz"
+          tar czf "${ARCHIVE}" -C "$(dirname "${BINARY}")" "$(basename "${BINARY}")"
+          echo "ARCHIVE=${ARCHIVE}" >> "${GITHUB_ENV}"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE }}
+          generate_release_notes: true
